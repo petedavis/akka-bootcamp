@@ -1,39 +1,50 @@
 using System;
 using Akka.Actor;
 
-namespace WinTail
+namespace WinTail;
+
+/// <summary>
+///     Actor responsible for reading FROM the console.
+///     Also responsible for calling <see cref="ActorSystem.Terminate" />.
+/// </summary>
+internal class ConsoleReaderActor : UntypedActor
 {
-    /// <summary>
-    /// Actor responsible for reading FROM the console. 
-    /// Also responsible for calling <see cref="ActorSystem.Terminate"/>.
-    /// </summary>
-    class ConsoleReaderActor : UntypedActor
+    public const string StartCommand = "start";
+    public const string ExitCommand = "exit";
+    private readonly IActorRef _validationActor;
+
+    public ConsoleReaderActor(IActorRef validationActor)
     {
-        public const string ExitCommand = "exit";
-        private IActorRef _consoleWriterActor;
+        _validationActor = validationActor;
+    }
 
-        public ConsoleReaderActor(IActorRef consoleWriterActor)
+    protected override void OnReceive(object message)
+    {
+        if (message.Equals(StartCommand)) DoPrintInstructions();
+
+        GetAndValidateInput();
+    }
+
+    private void DoPrintInstructions()
+    {
+        Console.WriteLine("Please provide the URI of a log file on disk.\n");
+    }
+
+    /// <summary>
+    ///     Reads input from console, validates it, then signals appropriate response
+    ///     (continue processing, error, success, etc.).
+    /// </summary>
+    private void GetAndValidateInput()
+    {
+        var message = Console.ReadLine();
+        if (!string.IsNullOrEmpty(message)
+            && string.Equals(message, ExitCommand, StringComparison.OrdinalIgnoreCase))
         {
-            _consoleWriterActor = consoleWriterActor;
+            // shut down the entire actor system (allows the process to exit)
+            Context.System.Terminate();
+            return;
         }
 
-        protected override void OnReceive(object message)
-        {
-            var read = Console.ReadLine();
-            if (!string.IsNullOrEmpty(read) && String.Equals(read, ExitCommand, StringComparison.OrdinalIgnoreCase))
-            {
-                // shut down the system (acquire handle to system via
-                // this actors context)
-                Context.System.Terminate();
-                return;
-            }
-
-            // send input to the console writer to process and print
-            // YOU NEED TO FILL IN HERE
-
-            // continue reading messages from the console
-            // YOU NEED TO FILL IN HERE
-        }
-
+        _validationActor.Tell(message);
     }
 }
